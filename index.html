@@ -1,0 +1,1776 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Memory Loom — AIの記憶を編むチャット</title>
+  <meta name="description" content="見える記憶、選べる文脈。Gemini APIを使った1ファイル完結の独自チャットUI。" />
+  <style>
+    :root {
+      --bg: #0b1020;
+      --bg2: #121933;
+      --panel: rgba(255,255,255,0.08);
+      --panel-strong: rgba(255,255,255,0.12);
+      --line: rgba(255,255,255,0.12);
+      --text: #eef2ff;
+      --muted: #b6bfdc;
+      --accent: #7c3aed;
+      --accent-2: #22d3ee;
+      --danger: #ef4444;
+      --success: #22c55e;
+      --warning: #f59e0b;
+      --shadow: 0 20px 60px rgba(0,0,0,0.35);
+      --radius-xl: 24px;
+      --radius-lg: 18px;
+      --radius-md: 14px;
+
+      --goal: #38bdf8;
+      --preference: #f472b6;
+      --constraint: #fb923c;
+      --style: #a78bfa;
+      --fact: #34d399;
+    }
+
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      background:
+        radial-gradient(circle at top left, rgba(124,58,237,0.18), transparent 30%),
+        radial-gradient(circle at top right, rgba(34,211,238,0.16), transparent 25%),
+        linear-gradient(180deg, #0a0f1f 0%, #0d1327 100%);
+      color: var(--text);
+      font-family:
+        Inter, "Noto Sans JP", "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif;
+      min-height: 100%;
+    }
+
+    body {
+      min-height: 100vh;
+      overflow: hidden;
+    }
+
+    button, input, textarea, select {
+      font: inherit;
+    }
+
+    button {
+      border: 0;
+      cursor: pointer;
+    }
+
+    .app {
+      height: 100vh;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      gap: 14px;
+      padding: 16px;
+    }
+
+    .glass {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+    }
+
+    .header {
+      border-radius: var(--radius-xl);
+      padding: 16px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      min-width: 0;
+    }
+
+    .brand-mark {
+      width: 52px;
+      height: 52px;
+      border-radius: 16px;
+      display: grid;
+      place-items: center;
+      background:
+        linear-gradient(135deg, rgba(124,58,237,0.95), rgba(34,211,238,0.95));
+      box-shadow: 0 12px 24px rgba(124,58,237,0.28);
+      font-size: 24px;
+    }
+
+    .brand-copy {
+      min-width: 0;
+    }
+
+    .brand-copy h1 {
+      margin: 0;
+      font-size: 1.15rem;
+      letter-spacing: 0.02em;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .badge-live {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 10px;
+      border-radius: 999px;
+      background: rgba(34,197,94,0.14);
+      border: 1px solid rgba(34,197,94,0.22);
+      color: #c8ffd8;
+      font-size: 0.74rem;
+      font-weight: 700;
+    }
+
+    .brand-copy p {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: 0.92rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .toolbar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .scene-group {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .scene-btn, .top-btn, .chip-btn, .action-btn {
+      color: var(--text);
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.1);
+      transition: 0.2s ease;
+    }
+
+    .scene-btn:hover, .top-btn:hover, .chip-btn:hover, .action-btn:hover {
+      transform: translateY(-1px);
+      background: rgba(255,255,255,0.1);
+    }
+
+    .scene-btn {
+      padding: 10px 13px;
+      border-radius: 999px;
+      font-size: 0.86rem;
+      color: var(--muted);
+    }
+
+    .scene-btn.active {
+      color: white;
+      background: linear-gradient(135deg, rgba(124,58,237,0.35), rgba(34,211,238,0.22));
+      border-color: rgba(124,58,237,0.5);
+      box-shadow: 0 10px 28px rgba(124,58,237,0.24);
+    }
+
+    .top-btn {
+      padding: 10px 14px;
+      border-radius: 12px;
+      font-size: 0.88rem;
+      font-weight: 700;
+    }
+
+    .top-btn.key {
+      background: rgba(34,211,238,0.12);
+      border-color: rgba(34,211,238,0.28);
+    }
+
+    .top-btn.clear {
+      background: rgba(239,68,68,0.12);
+      border-color: rgba(239,68,68,0.25);
+    }
+
+    .main {
+      min-height: 0;
+      display: grid;
+      grid-template-columns: minmax(0, 1.6fr) minmax(320px, 0.9fr);
+      gap: 14px;
+    }
+
+    .panel {
+      border-radius: var(--radius-xl);
+      min-height: 0;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .panel-head {
+      padding: 16px 18px 10px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .panel-head h2 {
+      margin: 0;
+      font-size: 1rem;
+      letter-spacing: 0.01em;
+    }
+
+    .panel-head .sub {
+      color: var(--muted);
+      font-size: 0.84rem;
+    }
+
+    .chat-scroll, .memory-scroll {
+      min-height: 0;
+      overflow: auto;
+      padding: 18px;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(255,255,255,0.22) transparent;
+    }
+
+    .chat-scroll::-webkit-scrollbar,
+    .memory-scroll::-webkit-scrollbar {
+      width: 10px;
+      height: 10px;
+    }
+
+    .chat-scroll::-webkit-scrollbar-thumb,
+    .memory-scroll::-webkit-scrollbar-thumb {
+      background: rgba(255,255,255,0.18);
+      border-radius: 999px;
+    }
+
+    .timeline {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .empty-state {
+      min-height: 100%;
+      display: grid;
+      place-items: center;
+      padding: 26px;
+    }
+
+    .empty-card {
+      width: min(100%, 700px);
+      border-radius: 24px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.1);
+      padding: 24px;
+      text-align: left;
+    }
+
+    .empty-card h3 {
+      margin: 0 0 10px;
+      font-size: 1.15rem;
+    }
+
+    .empty-card p {
+      margin: 0 0 14px;
+      color: var(--muted);
+      line-height: 1.7;
+    }
+
+    .starter-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .starter {
+      border-radius: 16px;
+      padding: 12px 13px;
+      background: rgba(255,255,255,0.05);
+      color: var(--text);
+      border: 1px solid rgba(255,255,255,0.08);
+      text-align: left;
+    }
+
+    .starter strong {
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    .starter span {
+      color: var(--muted);
+      font-size: 0.86rem;
+      line-height: 1.5;
+    }
+
+    .msg-row {
+      display: flex;
+      gap: 12px;
+      align-items: flex-end;
+      animation: rise 0.28s ease;
+    }
+
+    .msg-row.user {
+      justify-content: flex-end;
+    }
+
+    .avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 12px;
+      display: grid;
+      place-items: center;
+      flex: 0 0 36px;
+      font-size: 16px;
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.12);
+    }
+
+    .bubble-wrap {
+      max-width: min(78%, 820px);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .msg-row.user .bubble-wrap {
+      align-items: flex-end;
+    }
+
+    .bubble {
+      padding: 14px 15px;
+      border-radius: 18px;
+      line-height: 1.8;
+      white-space: pre-wrap;
+      word-break: break-word;
+      box-shadow: 0 10px 28px rgba(0,0,0,0.14);
+    }
+
+    .msg-row.user .bubble {
+      border-bottom-right-radius: 6px;
+      background: linear-gradient(135deg, rgba(124,58,237,0.92), rgba(91,33,182,0.95));
+    }
+
+    .msg-row.model .bubble {
+      border-bottom-left-radius: 6px;
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .bubble-meta {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 0.78rem;
+      padding-inline: 4px;
+      flex-wrap: wrap;
+    }
+
+    .meta-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 9px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .typing {
+      display: inline-flex;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .typing span {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #d7ddff;
+      opacity: 0.3;
+      animation: blink 1.1s infinite;
+    }
+
+    .typing span:nth-child(2) { animation-delay: 0.15s; }
+    .typing span:nth-child(3) { animation-delay: 0.3s; }
+
+    .memory-layout {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .memory-summary {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .summary-card {
+      border-radius: 16px;
+      padding: 12px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .summary-card .label {
+      color: var(--muted);
+      font-size: 0.76rem;
+      margin-bottom: 6px;
+    }
+
+    .summary-card .value {
+      font-size: 1.05rem;
+      font-weight: 800;
+    }
+
+    .memory-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .memory-card {
+      padding: 14px;
+      border-radius: 18px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.08);
+      transition: 0.2s ease;
+      animation: rise 0.24s ease;
+    }
+
+    .memory-card.disabled {
+      opacity: 0.48;
+      filter: grayscale(0.2);
+    }
+
+    .memory-card:hover {
+      transform: translateY(-1px);
+      background: rgba(255,255,255,0.07);
+    }
+
+    .memory-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .memory-type {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-size: 0.76rem;
+      font-weight: 800;
+      letter-spacing: 0.01em;
+      border: 1px solid transparent;
+    }
+
+    .memory-type.goal {
+      color: #dff6ff;
+      background: rgba(56,189,248,0.14);
+      border-color: rgba(56,189,248,0.24);
+    }
+    .memory-type.preference {
+      color: #ffe3f2;
+      background: rgba(244,114,182,0.14);
+      border-color: rgba(244,114,182,0.24);
+    }
+    .memory-type.constraint {
+      color: #fff1df;
+      background: rgba(251,146,60,0.14);
+      border-color: rgba(251,146,60,0.24);
+    }
+    .memory-type.style {
+      color: #f0e8ff;
+      background: rgba(167,139,250,0.14);
+      border-color: rgba(167,139,250,0.24);
+    }
+    .memory-type.fact {
+      color: #dbfff3;
+      background: rgba(52,211,153,0.14);
+      border-color: rgba(52,211,153,0.24);
+    }
+
+    .memory-text {
+      margin: 0;
+      line-height: 1.7;
+      font-size: 0.94rem;
+      word-break: break-word;
+    }
+
+    .memory-meta {
+      margin-top: 10px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 0.76rem;
+    }
+
+    .memory-actions {
+      margin-top: 12px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .chip-btn {
+      border-radius: 999px;
+      padding: 7px 10px;
+      font-size: 0.76rem;
+      color: var(--muted);
+    }
+
+    .chip-btn.primary {
+      color: white;
+      background: rgba(124,58,237,0.22);
+      border-color: rgba(124,58,237,0.34);
+    }
+
+    .chip-btn.warn {
+      color: #ffd9d9;
+      background: rgba(239,68,68,0.14);
+      border-color: rgba(239,68,68,0.28);
+    }
+
+    .inspector {
+      border-radius: 18px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      overflow: hidden;
+    }
+
+    .inspector-head {
+      width: 100%;
+      padding: 13px 14px;
+      background: transparent;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      color: var(--text);
+    }
+
+    .inspector-head .left {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 4px;
+      text-align: left;
+    }
+
+    .inspector-head .left span:last-child {
+      color: var(--muted);
+      font-size: 0.8rem;
+    }
+
+    .inspector-body {
+      padding: 0 14px 14px;
+      display: none;
+      color: var(--muted);
+      font-size: 0.9rem;
+      line-height: 1.75;
+    }
+
+    .inspector.open .inspector-body {
+      display: block;
+      animation: fade 0.2s ease;
+    }
+
+    .inspector-block {
+      border-top: 1px solid rgba(255,255,255,0.08);
+      padding-top: 12px;
+      margin-top: 12px;
+    }
+
+    .inspector-block:first-child {
+      border-top: 0;
+      margin-top: 0;
+      padding-top: 0;
+    }
+
+    .inspector code, .mini-code {
+      display: block;
+      margin-top: 8px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      background: rgba(0,0,0,0.22);
+      color: #dce5ff;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 0.78rem;
+      line-height: 1.7;
+    }
+
+    .composer {
+      border-radius: var(--radius-xl);
+      padding: 14px;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      align-items: end;
+    }
+
+    .composer-box {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .composer-tools {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+      color: var(--muted);
+      font-size: 0.82rem;
+    }
+
+    .textarea {
+      width: 100%;
+      resize: none;
+      min-height: 66px;
+      max-height: 180px;
+      padding: 16px 16px;
+      border-radius: 18px;
+      border: 1px solid rgba(255,255,255,0.1);
+      background: rgba(255,255,255,0.06);
+      color: var(--text);
+      outline: none;
+      line-height: 1.7;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.03);
+    }
+
+    .textarea:focus {
+      border-color: rgba(124,58,237,0.55);
+      box-shadow: 0 0 0 4px rgba(124,58,237,0.12);
+    }
+
+    .send-btn {
+      min-width: 132px;
+      height: 66px;
+      border-radius: 18px;
+      padding: 0 18px;
+      font-weight: 800;
+      letter-spacing: 0.01em;
+      color: white;
+      background: linear-gradient(135deg, #7c3aed, #4f46e5);
+      box-shadow: 0 16px 32px rgba(124,58,237,0.28);
+      transition: 0.2s ease;
+    }
+
+    .send-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 18px 36px rgba(124,58,237,0.34);
+    }
+
+    .send-btn:disabled {
+      cursor: not-allowed;
+      opacity: 0.6;
+      transform: none;
+      box-shadow: none;
+    }
+
+    .overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(5,8,18,0.62);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      z-index: 100;
+    }
+
+    .overlay.show {
+      display: flex;
+      animation: fade 0.2s ease;
+    }
+
+    .modal {
+      width: min(100%, 620px);
+      border-radius: 26px;
+      padding: 20px;
+      background: linear-gradient(180deg, rgba(18,25,51,0.98), rgba(11,16,32,0.96));
+      border: 1px solid rgba(255,255,255,0.1);
+      box-shadow: var(--shadow);
+    }
+
+    .modal h3 {
+      margin: 0 0 8px;
+      font-size: 1.08rem;
+    }
+
+    .modal p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.75;
+      font-size: 0.92rem;
+    }
+
+    .modal-body {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      margin-top: 16px;
+    }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .field label {
+      font-size: 0.86rem;
+      color: #dbe4ff;
+      font-weight: 700;
+    }
+
+    .field input[type="password"],
+    .field input[type="text"] {
+      width: 100%;
+      border-radius: 16px;
+      border: 1px solid rgba(255,255,255,0.1);
+      background: rgba(255,255,255,0.05);
+      color: var(--text);
+      padding: 14px 15px;
+      outline: none;
+    }
+
+    .field input:focus {
+      border-color: rgba(34,211,238,0.55);
+      box-shadow: 0 0 0 4px rgba(34,211,238,0.1);
+    }
+
+    .inline-check {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--text);
+      font-size: 0.9rem;
+    }
+
+    .notice {
+      border-radius: 18px;
+      padding: 12px 14px;
+      background: rgba(245,158,11,0.09);
+      border: 1px solid rgba(245,158,11,0.22);
+      color: #ffe9bd;
+      font-size: 0.88rem;
+      line-height: 1.7;
+    }
+
+    .modal-actions {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+      flex-wrap: wrap;
+      margin-top: 6px;
+    }
+
+    .action-btn {
+      border-radius: 14px;
+      padding: 11px 16px;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .action-btn.primary {
+      color: white;
+      background: linear-gradient(135deg, #7c3aed, #4f46e5);
+      border-color: transparent;
+    }
+
+    .action-btn.danger {
+      background: rgba(239,68,68,0.12);
+      border-color: rgba(239,68,68,0.24);
+      color: #ffd1d1;
+    }
+
+    .toast {
+      position: fixed;
+      top: 18px;
+      right: 18px;
+      z-index: 120;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      pointer-events: none;
+    }
+
+    .toast-item {
+      min-width: 260px;
+      max-width: min(92vw, 420px);
+      padding: 12px 14px;
+      border-radius: 16px;
+      background: rgba(15,21,42,0.9);
+      border: 1px solid rgba(255,255,255,0.12);
+      color: var(--text);
+      box-shadow: var(--shadow);
+      line-height: 1.6;
+      animation: rise 0.2s ease;
+      pointer-events: auto;
+    }
+
+    .toast-item.success { border-color: rgba(34,197,94,0.34); }
+    .toast-item.error { border-color: rgba(239,68,68,0.34); }
+    .toast-item.warn { border-color: rgba(245,158,11,0.34); }
+
+    .helper-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .ghost-link {
+      color: #bfefff;
+      text-decoration: none;
+    }
+
+    .ghost-link:hover {
+      text-decoration: underline;
+    }
+
+    .muted {
+      color: var(--muted);
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    @keyframes blink {
+      0%, 80%, 100% { opacity: 0.25; transform: scale(0.95); }
+      40% { opacity: 1; transform: scale(1.08); }
+    }
+
+    @keyframes rise {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes fade {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    @media (max-width: 1120px) {
+      .main {
+        grid-template-columns: 1fr;
+      }
+      .panel.chat-panel {
+        min-height: 48vh;
+      }
+      .panel.memory-panel {
+        min-height: 34vh;
+      }
+    }
+
+    @media (max-width: 860px) {
+      body {
+        overflow: auto;
+      }
+      .app {
+        height: auto;
+        min-height: 100vh;
+      }
+      .header {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .toolbar {
+        justify-content: flex-start;
+      }
+      .composer {
+        grid-template-columns: 1fr;
+      }
+      .send-btn {
+        width: 100%;
+        height: 54px;
+      }
+      .starter-grid {
+        grid-template-columns: 1fr;
+      }
+      .bubble-wrap {
+        max-width: 90%;
+      }
+      .memory-summary {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="header glass" id="header"></header>
+
+    <main class="main">
+      <section class="panel chat-panel glass">
+        <div class="panel-head">
+          <div>
+            <h2>Conversation Timeline</h2>
+            <div class="sub">会話の流れと、AIが使った記憶の痕跡</div>
+          </div>
+          <div class="sub" id="turn-count"></div>
+        </div>
+        <div class="chat-scroll" id="chat-scroll"></div>
+      </section>
+
+      <aside class="panel memory-panel glass">
+        <div class="panel-head">
+          <div>
+            <h2>Memory Panel</h2>
+            <div class="sub">AIに残す記憶を、あなたが選ぶ</div>
+          </div>
+          <div class="sub" id="active-memory-count"></div>
+        </div>
+        <div class="memory-scroll" id="memory-scroll"></div>
+      </aside>
+    </main>
+
+    <footer class="composer glass">
+      <div class="composer-box">
+        <div class="composer-tools">
+          <div id="composer-status">Scene: Advisor</div>
+          <div>Enter 送信 / Shift + Enter 改行</div>
+        </div>
+        <textarea id="message-input" class="textarea" placeholder="相談したいことを入力してください。たとえば『予算3000円で、辛いものが苦手な友人と行ける店を考えて』"></textarea>
+      </div>
+      <button id="send-btn" class="send-btn">Send to Loom</button>
+    </footer>
+  </div>
+
+  <div class="overlay" id="key-overlay" aria-hidden="true">
+    <div class="modal">
+      <h3>Local Key Vault</h3>
+      <p>
+        Gemini APIキーをこの画面から入力します。コードには埋め込まれず、必要な場合のみこの端末のローカルストレージへ保存します。
+      </p>
+
+      <div class="modal-body">
+        <div class="field">
+          <label for="api-key-input">Gemini API Key</label>
+          <input id="api-key-input" type="password" placeholder="AIza..." />
+        </div>
+
+        <label class="inline-check">
+          <input id="save-key-check" type="checkbox" />
+          この端末に保存する
+        </label>
+
+        <div class="notice">
+          公開静的サイトにAPIキーを埋め込むのは避けてください。必要ならGoogle Cloud側でHTTP referrer制限の設定も検討してください。
+        </div>
+
+        <div class="modal-actions">
+          <button class="action-btn" id="cancel-key-btn">閉じる</button>
+          <button class="action-btn danger" id="delete-key-btn">キー削除</button>
+          <button class="action-btn primary" id="save-key-btn">保存する</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const STORAGE_KEYS = {
+      API_KEY: "memoryloom_api_key",
+      SAVE_KEY: "memoryloom_save_key",
+      SCENE: "memoryloom_scene",
+      TURNS: "memoryloom_turns",
+      MEMORY: "memoryloom_memory",
+      INSPECTOR: "memoryloom_inspector"
+    };
+
+    const SCENES = {
+      advisor: {
+        label: "Advisor",
+        emoji: "🧭",
+        prompt: "あなたは実用的な相談役です。結論を先に述べ、次に理由と実行しやすい提案を簡潔に示してください。"
+      },
+      teacher: {
+        label: "Teacher",
+        emoji: "📘",
+        prompt: "あなたはわかりやすく教える先生です。構造化して説明し、必要に応じて短い例を添えてください。"
+      },
+      brainstorm: {
+        label: "Brainstorm",
+        emoji: "💡",
+        prompt: "あなたは発想支援のパートナーです。否定から入らず、選択肢を広げる形で多様なアイデアを提案してください。"
+      },
+      reviewer: {
+        label: "Reviewer",
+        emoji: "🛠️",
+        prompt: "あなたは改善のためのレビュー担当です。良い点を短く認めたうえで、改善点を具体的に指摘してください。"
+      },
+      interviewer: {
+        label: "Interviewer",
+        emoji: "🎤",
+        prompt: "あなたは対話型インタビュアーです。必要に応じて1〜2個の深掘り質問を返しながら、会話を前に進めてください。"
+      }
+    };
+
+    const TYPE_META = {
+      goal: { label: "Goal", icon: "🎯" },
+      preference: { label: "Preference", icon: "💗" },
+      constraint: { label: "Constraint", icon: "⛓️" },
+      style: { label: "Style", icon: "🎨" },
+      fact: { label: "Fact", icon: "📌" }
+    };
+
+    const state = {
+      apiKey: "",
+      saveKey: false,
+      model: "gemini-2.0-flash",
+      scene: "advisor",
+      isLoading: false,
+      recentTurns: [],
+      memoryCards: [],
+      ui: {
+        isKeyModalOpen: false,
+        isInspectorOpen: false,
+        lastError: ""
+      }
+    };
+
+    const els = {
+      header: document.getElementById("header"),
+      chatScroll: document.getElementById("chat-scroll"),
+      memoryScroll: document.getElementById("memory-scroll"),
+      turnCount: document.getElementById("turn-count"),
+      activeMemoryCount: document.getElementById("active-memory-count"),
+      composerStatus: document.getElementById("composer-status"),
+      messageInput: document.getElementById("message-input"),
+      sendBtn: document.getElementById("send-btn"),
+      overlay: document.getElementById("key-overlay"),
+      apiKeyInput: document.getElementById("api-key-input"),
+      saveKeyCheck: document.getElementById("save-key-check"),
+      saveKeyBtn: document.getElementById("save-key-btn"),
+      deleteKeyBtn: document.getElementById("delete-key-btn"),
+      cancelKeyBtn: document.getElementById("cancel-key-btn"),
+      toast: document.getElementById("toast")
+    };
+
+    function escapeHtml(str = "") {
+      return str
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    function uid() {
+      if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+      return "id-" + Date.now() + "-" + Math.random().toString(16).slice(2);
+    }
+
+    function nowTime(ts = Date.now()) {
+      return new Date(ts).toLocaleTimeString("ja-JP", {
+        hour: "2-digit",
+        minute: "2-digit"
+      });
+    }
+
+    function showToast(message, type = "success", timeout = 3200) {
+      const item = document.createElement("div");
+      item.className = `toast-item ${type}`;
+      item.textContent = message;
+      els.toast.appendChild(item);
+      setTimeout(() => {
+        item.style.opacity = "0";
+        item.style.transform = "translateY(-4px)";
+        setTimeout(() => item.remove(), 220);
+      }, timeout);
+    }
+
+    function loadState() {
+      const saveKey = localStorage.getItem(STORAGE_KEYS.SAVE_KEY) === "true";
+      state.saveKey = saveKey;
+      if (saveKey) {
+        state.apiKey = localStorage.getItem(STORAGE_KEYS.API_KEY) || "";
+      }
+
+      const scene = localStorage.getItem(STORAGE_KEYS.SCENE);
+      if (scene && SCENES[scene]) state.scene = scene;
+
+      try {
+        const turns = JSON.parse(localStorage.getItem(STORAGE_KEYS.TURNS) || "[]");
+        const memory = JSON.parse(localStorage.getItem(STORAGE_KEYS.MEMORY) || "[]");
+        const inspector = localStorage.getItem(STORAGE_KEYS.INSPECTOR) === "true";
+
+        if (Array.isArray(turns)) state.recentTurns = turns;
+        if (Array.isArray(memory)) state.memoryCards = memory;
+        state.ui.isInspectorOpen = inspector;
+      } catch (e) {
+        console.warn("state load failed", e);
+      }
+    }
+
+    function saveState() {
+      localStorage.setItem(STORAGE_KEYS.SAVE_KEY, String(state.saveKey));
+      localStorage.setItem(STORAGE_KEYS.SCENE, state.scene);
+      localStorage.setItem(STORAGE_KEYS.TURNS, JSON.stringify(state.recentTurns));
+      localStorage.setItem(STORAGE_KEYS.MEMORY, JSON.stringify(state.memoryCards));
+      localStorage.setItem(STORAGE_KEYS.INSPECTOR, String(state.ui.isInspectorOpen));
+
+      if (state.saveKey && state.apiKey) {
+        localStorage.setItem(STORAGE_KEYS.API_KEY, state.apiKey);
+      } else {
+        localStorage.removeItem(STORAGE_KEYS.API_KEY);
+      }
+    }
+
+    function resetConversation() {
+      if (!confirm("会話履歴とMemory Cardをすべてクリアします。よろしいですか？")) return;
+      state.recentTurns = [];
+      state.memoryCards = [];
+      saveState();
+      render();
+      showToast("会話と記憶をクリアしました", "success");
+    }
+
+    function openKeyModal() {
+      state.ui.isKeyModalOpen = true;
+      els.apiKeyInput.value = state.apiKey || "";
+      els.saveKeyCheck.checked = state.saveKey;
+      renderModal();
+      setTimeout(() => els.apiKeyInput.focus(), 50);
+    }
+
+    function closeKeyModal() {
+      state.ui.isKeyModalOpen = false;
+      renderModal();
+    }
+
+    function saveKeyFromModal() {
+      const key = els.apiKeyInput.value.trim();
+      const save = els.saveKeyCheck.checked;
+      state.apiKey = key;
+      state.saveKey = save;
+      saveState();
+      closeKeyModal();
+      showToast(key ? "APIキーを設定しました" : "APIキーを空にしました", key ? "success" : "warn");
+    }
+
+    function deleteStoredKey() {
+      state.apiKey = "";
+      state.saveKey = false;
+      localStorage.removeItem(STORAGE_KEYS.API_KEY);
+      localStorage.removeItem(STORAGE_KEYS.SAVE_KEY);
+      els.apiKeyInput.value = "";
+      els.saveKeyCheck.checked = false;
+      showToast("保存済みAPIキーを削除しました", "warn");
+    }
+
+    function createTurn(role, text, usedMemoryIds = []) {
+      return {
+        id: uid(),
+        role,
+        text,
+        createdAt: Date.now(),
+        usedMemoryIds
+      };
+    }
+
+    function classifyType(text) {
+      if (/予算|締切|までに|以内|上限|下限|条件|制約|NG|不可|必須/i.test(text)) return "constraint";
+      if (/好き|苦手|嫌い|得意|不得意|好み|推し|避けたい/i.test(text)) return "preference";
+      if (/結論から|短く|丁寧に|わかりやすく|箇条書き|敬語|フランク|厳しめ/i.test(text)) return "style";
+      if (/したい|したくて|目標|目的|達成|実現|目指す/i.test(text)) return "goal";
+      return "fact";
+    }
+
+    function normalizeMemoryText(text) {
+      return text
+        .replace(/\s+/g, " ")
+        .replace(/。+/g, "。")
+        .trim();
+    }
+
+    function splitCandidateLines(text) {
+      return text
+        .split(/[。\n！？!?]/)
+        .map(s => s.trim())
+        .filter(Boolean);
+    }
+
+    function extractMemoryCandidates(text, turnId) {
+      const lines = splitCandidateLines(text);
+      const candidates = [];
+
+      for (const line of lines) {
+        if (line.length < 6) continue;
+
+        const shouldCapture =
+          /私は|僕は|自分は|大学生|社会人|在住|住んで|予算|円|まで|以内|好き|苦手|嫌い|したい|目標|目的|結論から|短く|丁寧に|わかりやすく|必須|避けたい|希望/i.test(line);
+
+        if (!shouldCapture) continue;
+
+        const normalized = normalizeMemoryText(line);
+        candidates.push({
+          id: uid(),
+          type: classifyType(normalized),
+          text: normalized,
+          pinned: true,
+          enabled: true,
+          sourceTurnId: turnId,
+          createdAt: Date.now(),
+          confidence: 0.72
+        });
+      }
+
+      return candidates.slice(0, 4);
+    }
+
+    function similarity(a, b) {
+      const x = a.toLowerCase();
+      const y = b.toLowerCase();
+      if (x === y) return 1;
+      if (x.includes(y) || y.includes(x)) return 0.88;
+
+      const setX = new Set(x.split(""));
+      const setY = new Set(y.split(""));
+      let common = 0;
+      for (const ch of setX) if (setY.has(ch)) common++;
+      return common / Math.max(setX.size, setY.size, 1);
+    }
+
+    function mergeMemoryCards(newCards) {
+      for (const incoming of newCards) {
+        const existing = state.memoryCards.find(card =>
+          card.type === incoming.type &&
+          similarity(card.text, incoming.text) >= 0.82
+        );
+
+        if (existing) {
+          if (incoming.text.length > existing.text.length) {
+            existing.text = incoming.text;
+          }
+          existing.enabled = true;
+          existing.pinned = true;
+          existing.updatedAt = Date.now();
+        } else {
+          state.memoryCards.unshift(incoming);
+        }
+      }
+
+      if (state.memoryCards.length > 18) {
+        state.memoryCards = state.memoryCards.slice(0, 18);
+      }
+    }
+
+    function getActiveMemoryCards() {
+      return state.memoryCards.filter(card => card.enabled && card.pinned);
+    }
+
+    function getTrimmedRecentTurns(maxChars = 5000, maxTurns = 12) {
+      const sliced = state.recentTurns.slice(-maxTurns);
+      const out = [];
+      let total = 0;
+
+      for (let i = sliced.length - 1; i >= 0; i--) {
+        const t = sliced[i];
+        const len = (t.text || "").length;
+        if (total + len > maxChars && out.length > 0) break;
+        out.unshift(t);
+        total += len;
+      }
+      return out;
+    }
+
+    function buildMemoryContext(cards) {
+      if (!cards.length) return "固定された記憶は現在ありません。";
+      return [
+        "以下はこの会話で優先して考慮すべきユーザー記憶です。",
+        ...cards.map(card => `- [${TYPE_META[card.type]?.label || card.type}] ${card.text}`)
+      ].join("\n");
+    }
+
+    function buildContents() {
+      const scene = SCENES[state.scene];
+      const activeCards = getActiveMemoryCards();
+      const recentTurns = getTrimmedRecentTurns();
+
+      const contextMessage = [
+        scene.prompt,
+        "",
+        buildMemoryContext(activeCards),
+        "",
+        "応答ルール:",
+        "- 直前の会話の流れを踏まえて答える",
+        "- 記憶に矛盾がある場合は新しい文脈を優先する",
+        "- 日本語で自然に答える",
+        "- 必要に応じて簡潔に整理して返す"
+      ].join("\n");
+
+      const contents = [
+        {
+          role: "user",
+          parts: [{ text: contextMessage }]
+        },
+        {
+          role: "model",
+          parts: [{ text: "了解しました。この記憶と方針を考慮して会話を続けます。" }]
+        }
+      ];
+
+      for (const turn of recentTurns) {
+        contents.push({
+          role: turn.role,
+          parts: [{ text: turn.text }]
+        });
+      }
+
+      return contents;
+    }
+
+    async function callGemini(contents) {
+      const url =
+        `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(state.model)}:generateContent?key=${encodeURIComponent(state.apiKey)}`;
+
+      const res = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          contents,
+          generationConfig: {
+            temperature: 0.85,
+            topP: 0.95,
+            topK: 40,
+            maxOutputTokens: 900
+          }
+        })
+      });
+
+      if (!res.ok) {
+        let detail = "";
+        try {
+          detail = await res.text();
+        } catch (_) {}
+        throw new Error(`HTTP ${res.status} ${detail}`);
+      }
+
+      const data = await res.json();
+      const parts = data?.candidates?.[0]?.content?.parts || [];
+      const text = parts.map(p => p.text || "").join("").trim();
+
+      if (!text) {
+        throw new Error("応答テキストを取得できませんでした。");
+      }
+
+      return text;
+    }
+
+    function formatError(err) {
+      const msg = String(err?.message || err || "");
+      if (/401|403/.test(msg)) {
+        return "APIキーが無効、または利用制限設定に問題がある可能性があります。";
+      }
+      if (/429/.test(msg)) {
+        return "無料枠またはレート制限に達した可能性があります。時間をおいて再試行してください。";
+      }
+      if (/500|502|503|504/.test(msg)) {
+        return "Gemini API側で一時的なエラーが発生している可能性があります。";
+      }
+      return "通信に失敗しました。APIキーとネットワーク状態を確認してください。";
+    }
+
+    async function sendMessage() {
+      const text = els.messageInput.value.trim();
+      if (!text || state.isLoading) return;
+
+      if (!state.apiKey) {
+        showToast("先にAPIキーを設定してください", "warn");
+        openKeyModal();
+        return;
+      }
+
+      const userTurn = createTurn("user", text);
+      state.recentTurns.push(userTurn);
+
+      const candidates = extractMemoryCandidates(text, userTurn.id);
+      mergeMemoryCards(candidates);
+
+      els.messageInput.value = "";
+      autoResizeTextarea();
+      state.isLoading = true;
+      saveState();
+      render();
+      scrollChatToBottom();
+
+      try {
+        const contents = buildContents();
+        const answer = await callGemini(contents);
+        const usedMemoryIds = getActiveMemoryCards().map(c => c.id);
+        const modelTurn = createTurn("model", answer, usedMemoryIds);
+        state.recentTurns.push(modelTurn);
+        saveState();
+        render();
+        scrollChatToBottom();
+      } catch (err) {
+        console.error(err);
+        state.ui.lastError = formatError(err);
+        showToast(state.ui.lastError, "error", 4400);
+        render();
+      } finally {
+        state.isLoading = false;
+        render();
+        scrollChatToBottom();
+      }
+    }
+
+    function toggleScene(sceneKey) {
+      if (!SCENES[sceneKey]) return;
+      state.scene = sceneKey;
+      saveState();
+      render();
+      showToast(`Scene を ${SCENES[sceneKey].label} に切り替えました`, "success");
+    }
+
+    function toggleInspector() {
+      state.ui.isInspectorOpen = !state.ui.isInspectorOpen;
+      saveState();
+      renderMemoryPanel();
+    }
+
+    function toggleMemoryEnabled(id) {
+      const target = state.memoryCards.find(c => c.id === id);
+      if (!target) return;
+      target.enabled = !target.enabled;
+      saveState();
+      renderMemoryPanel();
+    }
+
+    function toggleMemoryPinned(id) {
+      const target = state.memoryCards.find(c => c.id === id);
+      if (!target) return;
+      target.pinned = !target.pinned;
+      if (!target.pinned) target.enabled = false;
+      saveState();
+      renderMemoryPanel();
+    }
+
+    function deleteMemory(id) {
+      state.memoryCards = state.memoryCards.filter(c => c.id !== id);
+      saveState();
+      renderMemoryPanel();
+      showToast("Memory Card を削除しました", "warn");
+    }
+
+    function renderHeader() {
+      const keyState = state.apiKey ? "Key Ready" : "Key Missing";
+      const keyClass = state.apiKey ? "badge-live" : "badge-live";
+      const sceneButtons = Object.entries(SCENES).map(([key, scene]) => {
+        return `
+          <button class="scene-btn ${state.scene === key ? "active" : ""}" data-scene="${key}">
+            ${scene.emoji} ${scene.label}
+          </button>
+        `;
+      }).join("");
+
+      els.header.innerHTML = `
+        <div class="brand">
+          <div class="brand-mark">🧠</div>
+          <div class="brand-copy">
+            <h1>
+              Memory Loom
+              <span class="${keyClass}">${state.apiKey ? "●" : "○"} ${escapeHtml(keyState)}</span>
+            </h1>
+            <p>見える記憶、選べる文脈。AIの“覚え方”を操作するチャット。</p>
+          </div>
+        </div>
+
+        <div class="toolbar">
+          <div class="scene-group">${sceneButtons}</div>
+          <button class="top-btn key" id="open-key-btn">🔐 Key Vault</button>
+          <button class="top-btn clear" id="clear-btn">🧹 Clear</button>
+        </div>
+      `;
+
+      els.header.querySelectorAll("[data-scene]").forEach(btn => {
+        btn.addEventListener("click", () => toggleScene(btn.dataset.scene));
+      });
+      document.getElementById("open-key-btn").addEventListener("click", openKeyModal);
+      document.getElementById("clear-btn").addEventListener("click", resetConversation);
+    }
+
+    function renderChat() {
+      els.turnCount.textContent = `${state.recentTurns.length} turns`;
+      els.composerStatus.textContent = `Scene: ${SCENES[state.scene].label}`;
+
+      if (!state.recentTurns.length) {
+        els.chatScroll.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-card">
+              <h3>ようこそ、Memory Loom へ</h3>
+              <p>
+                これは“AIが何を覚えているか”を見える化するチャットです。会話から抽出された情報は右側に Memory Card として現れ、
+                あなたが有効・無効・削除を選べます。
+              </p>
+              <div class="starter-grid">
+                <button class="starter" data-starter="予算3000円で、辛いものが苦手な友人と行けるディナー候補を考えて。結論から短く教えて。">
+                  <strong>🍽 レストラン相談</strong>
+                  <span>制約・好み・話し方を一気に学習させる</span>
+                </button>
+                <button class="starter" data-starter="就活の自己PRを一緒に改善したい。私は大学3年で、丁寧すぎない自然な表現が好き。">
+                  <strong>💼 自己PR改善</strong>
+                  <span>Fact と Style をカード化して育てる</span>
+                </button>
+                <button class="starter" data-starter="来月までにポートフォリオを作りたい。厳しめレビューで進めて。">
+                  <strong>🛠 レビュー進行</strong>
+                  <span>Goal と Scene を組み合わせる</span>
+                </button>
+                <button class="starter" data-starter="新しいWebアプリのアイデア出しをしたい。否定せずに広げてほしい。">
+                  <strong>💡 アイデア発想</strong>
+                  <span>Brainstorm Scene で文脈を変える</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        `;
+
+        els.chatScroll.querySelectorAll("[data-starter]").forEach(btn => {
+          btn.addEventListener("click", () => {
+            els.messageInput.value = btn.dataset.starter;
+            autoResizeTextarea();
+            els.messageInput.focus();
+          });
+        });
+        return;
+      }
+
+      const items = state.recentTurns.map(turn => {
+        const isUser = turn.role === "user";
+        const usedCount = turn.usedMemoryIds?.length || 0;
+        const bubbleText = escapeHtml(turn.text);
+        return `
+          <div class="msg-row ${isUser ? "user" : "model"}">
+            ${isUser ? "" : `<div class="avatar">🤖</div>`}
+            <div class="bubble-wrap">
+              <div class="bubble">${bubbleText}</div>
+              <div class="bubble-meta">
+                <span>${isUser ? "You" : "Memory Loom"} · ${nowTime(turn.createdAt)}</span>
+                ${!isUser ? `<span class="meta-pill">🧠 Used memory: ${usedCount}</span>` : ""}
+              </div>
+            </div>
+            ${isUser ? `<div class="avatar">🧑</div>` : ""}
+          </div>
+        `;
+      }).join("");
+
+      const typing = state.isLoading ? `
+        <div class="msg-row model">
+          <div class="avatar">🤖</div>
+          <div class="bubble-wrap">
+            <div class="bubble">
+              <span class="typing"><span></span><span></span><span></span></span>
+            </div>
+            <div class="bubble-meta">
+              <span>Memory Loom · thinking...</span>
+            </div>
+          </div>
+        </div>
+      ` : "";
+
+      els.chatScroll.innerHTML = `<div class="timeline">${items}${typing}</div>`;
+    }
+
+    function renderMemoryPanel() {
+      const active = getActiveMemoryCards();
+      const total = state.memoryCards.length;
+      els.activeMemoryCount.textContent = `${active.length} active / ${total} total`;
+
+      const summary = `
+        <div class="memory-summary">
+          <div class="summary-card">
+            <div class="label">Active Memory</div>
+            <div class="value">${active.length}</div>
+          </div>
+          <div class="summary-card">
+            <div class="label">Recent Turns</div>
+            <div class="value">${getTrimmedRecentTurns().length}</div>
+          </div>
+          <div class="summary-card">
+            <div class="label">Scene</div>
+            <div class="value">${escapeHtml(SCENES[state.scene].label)}</div>
+          </div>
+        </div>
+      `;
+
+      const memoryList = state.memoryCards.length
+        ? state.memoryCards.map(card => {
+            const meta = TYPE_META[card.type] || { label: card.type, icon: "•" };
+            return `
+              <article class="memory-card ${card.enabled && card.pinned ? "" : "disabled"}">
+                <div class="memory-top">
+                  <span class="memory-type ${card.type}">
+                    ${meta.icon} ${meta.label}
+                  </span>
+                </div>
+                <p class="memory-text">${escapeHtml(card.text)}</p>
+                <div class="memory-meta">
+                  <span>source: turn ${Math.max(1, state.recentTurns.findIndex(t => t.id === card.sourceTurnId) + 1)}</span>
+                  <span>confidence: ${(card.confidence * 100).toFixed(0)}%</span>
+                  <span>${card.pinned ? "pinned" : "unpinned"}</span>
+                  <span>${card.enabled ? "enabled" : "disabled"}</span>
+                </div>
+                <div class="memory-actions">
+                  <button class="chip-btn ${card.pinned ? "primary" : ""}" data-memory-pin="${card.id}">
+                    ${card.pinned ? "📍 固定中" : "📌 固定する"}
+                  </button>
+                  <button class="chip-btn" data-memory-toggle="${card.id}">
+                    ${card.enabled ? "🙈 一時無効" : "👁️ 有効化"}
+                  </button>
+                  <button class="chip-btn warn" data-memory-delete="${card.id}">
+                    🗑 削除
+                  </button>
+                </div>
+              </article>
+            `;
+          }).join("")
+        : `
+          <div class="empty-card" style="padding:18px;">
+            <h3 style="font-size:1rem;">まだ記憶はありません</h3>
+            <p style="margin-bottom:0;">
+              会話の中に「予算」「好み」「話し方」「目的」などが出てくると、右側に自動でカードが生成されます。
+            </p>
+          </div>
+        `;
+
+      const inspectorActive = state.ui.isInspectorOpen ? "open" : "";
+      const inspector = `
+        <section class="inspector ${inspectorActive}">
+          <button class="inspector-head" id="toggle-inspector-btn">
+            <div class="left">
+              <span>Prompt Inspector</span>
+              <span>今回AIへ送る文脈の断面を見る</span>
+            </div>
+            <div>${state.ui.isInspectorOpen ? "▾" : "▸"}</div>
+          </button>
+          <div class="inspector-body">
+            <div class="inspector-block">
+              <strong>Scene Instruction</strong>
+              <code>${escapeHtml(SCENES[state.scene].prompt)}</code>
+            </div>
+            <div class="inspector-block">
+              <strong>Active Memory</strong>
+              <code>${escapeHtml(buildMemoryContext(active))}</code>
+            </div>
+            <div class="inspector-block">
+              <strong>Recent Turns Included</strong>
+              <div class="mini-code">${escapeHtml(String(getTrimmedRecentTurns().length))} turns / max 12 turns / compact mode</div>
+            </div>
+            <div class="inspector-block">
+              <strong>Model</strong>
+              <div class="mini-code">${escapeHtml(state.model)}</div>
+            </div>
+          </div>
+        </section>
+      `;
+
+      els.memoryScroll.innerHTML = `
+        <div class="memory-layout">
+          ${summary}
+          <div class="memory-list">${memoryList}</div>
+          ${inspector}
+        </div>
+      `;
+
+      els.memoryScroll.querySelectorAll("[data-memory-pin]").forEach(btn => {
+        btn.addEventListener("click", () => toggleMemoryPinned(btn.dataset.memoryPin));
+      });
+      els.memoryScroll.querySelectorAll("[data-memory-toggle]").forEach(btn => {
+        btn.addEventListener("click", () => toggleMemoryEnabled(btn.dataset.memoryToggle));
+      });
+      els.memoryScroll.querySelectorAll("[data-memory-delete]").forEach(btn => {
+        btn.addEventListener("click", () => deleteMemory(btn.dataset.memoryDelete));
+      });
+      const inspectorBtn = document.getElementById("toggle-inspector-btn");
+      if (inspectorBtn) inspectorBtn.addEventListener("click", toggleInspector);
+    }
+
+    function renderModal() {
+      els.overlay.classList.toggle("show", state.ui.isKeyModalOpen);
+      els.overlay.setAttribute("aria-hidden", String(!state.ui.isKeyModalOpen));
+    }
+
+    function render() {
+      renderHeader();
+      renderChat();
+      renderMemoryPanel();
+      renderModal();
+
+      els.sendBtn.disabled = state.isLoading;
+      els.sendBtn.textContent = state.isLoading ? "Thinking..." : "Send to Loom";
+    }
+
+    function scrollChatToBottom() {
+      requestAnimationFrame(() => {
+        els.chatScroll.scrollTop = els.chatScroll.scrollHeight;
+      });
+    }
+
+    function autoResizeTextarea() {
+      els.messageInput.style.height = "auto";
+      els.messageInput.style.height = Math.min(els.messageInput.scrollHeight, 180) + "px";
+    }
+
+    function bindEvents() {
+      els.sendBtn.addEventListener("click", sendMessage);
+
+      els.messageInput.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" && !e.shiftKey) {
+          e.preventDefault();
+          sendMessage();
+        }
+      });
+      els.messageInput.addEventListener("input", autoResizeTextarea);
+
+      els.cancelKeyBtn.addEventListener("click", closeKeyModal);
+      els.saveKeyBtn.addEventListener("click", saveKeyFromModal);
+      els.deleteKeyBtn.addEventListener("click", deleteStoredKey);
+
+      els.overlay.addEventListener("click", (e) => {
+        if (e.target === els.overlay) closeKeyModal();
+      });
+
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape" && state.ui.isKeyModalOpen) closeKeyModal();
+      });
+    }
+
+    function init() {
+      loadState();
+      bindEvents();
+      autoResizeTextarea();
+      render();
+      if (!state.apiKey) {
+        setTimeout(() => {
+          showToast("最初にAPIキーを設定すると会話を始められます", "warn", 3800);
+        }, 300);
+      }
+    }
+
+    init();
+  </script>
+</body>
+</html>
