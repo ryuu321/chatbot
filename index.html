@@ -6,242 +6,142 @@
   <title>Memory Loom — AIの記憶を編むチャット</title>
   <style>
     :root {
-      --bg: #0b1020;
-      --bg2: #121933;
-      --panel: rgba(255,255,255,0.08);
-      --panel-strong: rgba(255,255,255,0.12);
-      --line: rgba(255,255,255,0.12);
-      --text: #eef2ff;
-      --muted: #b6bfdc;
-      --accent: #7c3aed;
-      --accent-2: #22d3ee;
-      --danger: #ef4444;
-      --success: #22c55e;
-      --warning: #f59e0b;
-      --shadow: 0 20px 60px rgba(0,0,0,0.35);
-      --radius-xl: 24px;
-      --radius-lg: 18px;
-      --radius-md: 14px;
-
-      --goal: #38bdf8;
-      --preference: #f472b6;
-      --constraint: #fb923c;
-      --style: #a78bfa;
-      --fact: #34d399;
+      --bg: #0b1020; --bg2: #121933; --panel: rgba(255,255,255,0.08);
+      --text: #eef2ff; --muted: #b6bfdc; --accent: #7c3aed; --danger: #ef4444;
+      --line: rgba(255,255,255,0.12); --radius-xl: 24px;
     }
-
     * { box-sizing: border-box; }
-    html, body {
-      margin: 0;
-      padding: 0;
-      background:
-        radial-gradient(circle at top left, rgba(124,58,237,0.18), transparent 30%),
-        radial-gradient(circle at top right, rgba(34,211,238,0.16), transparent 25%),
-        linear-gradient(180deg, #0a0f1f 0%, #0d1327 100%);
-      color: var(--text);
-      font-family: Inter, "Noto Sans JP", sans-serif;
-      min-height: 100vh;
-      overflow: hidden;
+    body {
+      margin: 0; background: linear-gradient(180deg, #0a0f1f 0%, #0d1327 100%);
+      color: var(--text); font-family: sans-serif; height: 100vh; overflow: hidden;
     }
-
     .app { height: 100vh; display: grid; grid-template-rows: auto 1fr auto; gap: 14px; padding: 16px; }
-    .glass { background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); backdrop-filter: blur(18px); }
-    .header { border-radius: var(--radius-xl); padding: 16px 18px; display: flex; align-items: center; justify-content: space-between; }
-    .brand-mark { width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center; background: linear-gradient(135deg, #7c3aed, #22d3ee); font-size: 20px; }
-    .badge-live { padding: 4px 8px; border-radius: 999px; background: rgba(34,197,94,0.15); color: #c8ffd8; font-size: 0.7rem; font-weight: bold; }
-    
+    .glass { background: var(--panel); border: 1px solid var(--line); backdrop-filter: blur(18px); border-radius: var(--radius-xl); }
+    .header { padding: 16px; display: flex; justify-content: space-between; align-items: center; }
     .main { display: grid; grid-template-columns: 1.6fr 0.9fr; gap: 14px; min-height: 0; }
-    .panel { border-radius: var(--radius-xl); display: flex; flex-direction: column; overflow: hidden; }
-    .panel-head { padding: 14px 18px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; }
-    .chat-scroll, .memory-scroll { flex: 1; overflow-y: auto; padding: 18px; scrollbar-width: thin; }
-
-    .msg-row { display: flex; gap: 12px; margin-bottom: 16px; animation: rise 0.2s ease; }
+    .panel { display: flex; flex-direction: column; overflow: hidden; }
+    .chat-scroll { flex: 1; overflow-y: auto; padding: 18px; display: flex; flex-direction: column; gap: 12px; }
+    .msg-row { display: flex; gap: 12px; animation: rise 0.2s ease; }
     .msg-row.user { justify-content: flex-end; }
-    .avatar { width: 36px; height: 36px; border-radius: 10px; background: var(--panel-strong); display: grid; place-items: center; }
-    .bubble { padding: 12px 16px; border-radius: 18px; max-width: 80%; line-height: 1.6; white-space: pre-wrap; word-break: break-word; }
-    .user .bubble { background: linear-gradient(135deg, #7c3aed, #5b21b6); border-bottom-right-radius: 4px; }
-    .model .bubble { background: var(--panel-strong); border: 1px solid var(--line); border-bottom-left-radius: 4px; }
-    .error-bubble { border: 1px solid var(--danger) !important; background: rgba(239, 68, 68, 0.1) !important; color: #ffcfcf; }
-
-    .composer { border-radius: var(--radius-xl); padding: 14px; display: grid; grid-template-columns: 1fr auto; gap: 12px; }
-    .textarea { width: 100%; background: rgba(0,0,0,0.2); border: 1px solid var(--line); color: #fff; padding: 12px; border-radius: 14px; resize: none; outline: none; }
-    .send-btn { background: linear-gradient(135deg, #7c3aed, #4f46e5); color: white; border-radius: 14px; padding: 0 24px; font-weight: bold; }
-
-    .memory-card { background: rgba(255,255,255,0.04); border: 1px solid var(--line); padding: 12px; border-radius: 14px; margin-bottom: 10px; font-size: 0.9rem; }
-    .memory-type { font-size: 0.7rem; font-weight: bold; padding: 2px 6px; border-radius: 4px; margin-bottom: 6px; display: inline-block; }
-    .fact { background: rgba(52,211,153,0.2); color: #34d399; }
-    
-    .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: none; place-items: center; z-index: 100; }
-    .modal { background: #121933; padding: 24px; border-radius: 20px; width: 90%; max-width: 400px; border: 1px solid var(--line); }
-    .show { display: grid; }
-
+    .bubble { padding: 12px 16px; border-radius: 18px; max-width: 85%; white-space: pre-wrap; line-height: 1.6; }
+    .user .bubble { background: var(--accent); border-bottom-right-radius: 4px; }
+    .model .bubble { background: rgba(255,255,255,0.1); border: 1px solid var(--line); border-bottom-left-radius: 4px; }
+    /* エラー用のスタイル */
+    .error-bubble { border: 1px solid var(--danger) !important; background: rgba(239, 68, 68, 0.15) !important; color: #ffbaba; }
+    .composer { padding: 14px; display: grid; grid-template-columns: 1fr auto; gap: 12px; }
+    .textarea { background: rgba(0,0,0,0.3); border: 1px solid var(--line); color: #fff; padding: 12px; border-radius: 14px; resize: none; outline: none; }
+    .send-btn { background: var(--accent); color: white; border: none; border-radius: 14px; padding: 0 24px; cursor: pointer; font-weight: bold; }
+    .memory-card { background: rgba(255,255,255,0.05); padding: 10px; border-radius: 12px; margin-bottom: 8px; font-size: 0.85rem; border-left: 3px solid var(--accent); }
     @keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
   </style>
 </head>
 <body>
   <div class="app">
     <header class="header glass">
-      <div style="display:flex; align-items:center; gap:12px;">
-        <div class="brand-mark">🧠</div>
-        <div>
-          <h1 style="margin:0; font-size:1.1rem;">Memory Loom <span class="badge-live" id="key-status">● Lite Mode</span></h1>
-        </div>
-      </div>
-      <div style="display:flex; gap:8px;">
-        <button onclick="openKeyModal()" style="background:none; color:var(--muted); border:1px solid var(--line); padding:6px 12px; border-radius:8px;">🔐 API Key</button>
-        <button onclick="resetConversation()" style="background:none; color:var(--danger); border:1px solid var(--danger); padding:6px 12px; border-radius:8px;">🧹 Clear</button>
+      <div style="display:flex; align-items:center; gap:10px;"><strong>🧠 Memory Loom</strong> <small style="color:var(--muted)">v2.5 Lite</small></div>
+      <div>
+        <button onclick="openKey()" style="background:none; border:1px solid var(--line); color:#fff; padding:5px 10px; border-radius:6px; cursor:pointer;">🔐 API Key</button>
+        <button onclick="clearChat()" style="background:none; border:1px solid var(--danger); color:var(--danger); padding:5px 10px; border-radius:6px; cursor:pointer; margin-left:5px;">🧹 Clear</button>
       </div>
     </header>
 
     <main class="main">
-      <section class="panel glass">
-        <div class="panel-head"><h2>Timeline</h2><span id="turn-count" style="font-size:0.8rem; color:var(--muted);">0 turns</span></div>
-        <div class="chat-scroll" id="chat-scroll"></div>
-      </section>
-
-      <aside class="panel glass">
-        <div class="panel-head"><h2>Memory Cards</h2></div>
-        <div class="memory-scroll" id="memory-scroll"></div>
-      </aside>
+      <section class="panel glass"><div class="chat-scroll" id="chat-box"></div></section>
+      <aside class="panel glass" style="padding:16px;"><h3>Memory</h3><div id="mem-box"></div></aside>
     </main>
 
     <footer class="composer glass">
-      <textarea id="message-input" class="textarea" rows="2" placeholder="メッセージを入力..."></textarea>
-      <button id="send-btn" class="send-btn">Send</button>
+      <textarea id="input" class="textarea" placeholder="メッセージを入力..."></textarea>
+      <button id="send" class="send-btn">Send</button>
     </footer>
   </div>
 
-  <div class="overlay" id="key-overlay">
-    <div class="modal">
-      <h3>API Key Setting</h3>
-      <input type="password" id="api-key-input" style="width:100%; padding:10px; margin:10px 0; border-radius:8px; border:1px solid var(--line); background:#000; color:#fff;">
-      <button onclick="saveKey()" style="width:100%; padding:10px; background:var(--accent); color:white; border-radius:8px; border:none; font-weight:bold;">Save & Close</button>
+  <div id="modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.8); place-items:center; z-index:100;">
+    <div class="glass" style="padding:24px; width:320px; text-align:center;">
+      <h3>API Key</h3>
+      <input type="password" id="key-in" style="width:100%; padding:10px; margin:15px 0; border-radius:8px; border:none; background:#000; color:#fff;">
+      <button onclick="saveKey()" style="width:100%; padding:10px; background:var(--accent); color:#fff; border:none; border-radius:8px; cursor:pointer;">Save</button>
     </div>
   </div>
 
   <script>
     const state = {
-      // 最新の2026年安定版軽量モデルを指定
-      model: "gemini-2.5-flash-lite", 
-      apiKey: localStorage.getItem("loom_key") || "",
-      recentTurns: JSON.parse(localStorage.getItem("loom_turns") || "[]"),
-      memoryCards: JSON.parse(localStorage.getItem("loom_mem") || "[]"),
-      isLoading: false
+      model: "gemini-2.5-flash-lite", // 2026年最新の軽量モデル
+      apiKey: localStorage.getItem("key") || "",
+      history: JSON.parse(localStorage.getItem("hist") || "[]"),
+      mems: JSON.parse(localStorage.getItem("mems") || "[]"),
+      loading: false
     };
 
-    const els = {
-      chat: document.getElementById("chat-scroll"),
-      mem: document.getElementById("memory-scroll"),
-      input: document.getElementById("message-input"),
-      btn: document.getElementById("send-btn"),
-      overlay: document.getElementById("key-overlay"),
-      keyInput: document.getElementById("api-key-input")
-    };
+    function saveKey() { state.apiKey = document.getElementById("key-in").value; localStorage.setItem("key", state.apiKey); document.getElementById("modal").style.display = "none"; }
+    function openKey() { document.getElementById("key-in").value = state.apiKey; document.getElementById("modal").style.display = "grid"; }
+    function clearChat() { if(!confirm("消去しますか？")) return; state.history = []; state.mems = []; localStorage.clear(); render(); }
 
-    function saveKey() {
-      state.apiKey = els.keyInput.value;
-      localStorage.setItem("loom_key", state.apiKey);
-      els.overlay.classList.remove("show");
-    }
-
-    function openKeyModal() {
-      els.keyInput.value = state.apiKey;
-      els.overlay.classList.add("show");
-    }
-
-    function resetConversation() {
-      if(!confirm("全て消去しますか？")) return;
-      state.recentTurns = [];
-      state.memoryCards = [];
-      localStorage.removeItem("loom_turns");
-      localStorage.removeItem("loom_mem");
-      render();
-    }
-
-    async function callGemini(contents) {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${state.model}:generateContent?key=${state.apiKey}`;
-      const res = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+    async function call(contents) {
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${state.model}:generateContent?key=${state.apiKey}`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ contents })
       });
-
       if (!res.ok) {
-        let errorMsg = "";
-        try {
-          const errJson = await res.json();
-          errorMsg = errJson.error.message;
-        } catch {
-          errorMsg = await res.text();
-        }
-        throw new Error(`[HTTP ${res.status}] ${errorMsg}`);
+        let msg = "";
+        try { const j = await res.json(); msg = j.error.message; } catch { msg = await res.text(); }
+        throw new Error(`[HTTP ${res.status}] ${msg}`);
       }
-
       const data = await res.json();
       return data.candidates[0].content.parts[0].text;
     }
 
-    async function sendMessage() {
-      const text = els.input.value.trim();
-      if (!text || state.isLoading || !state.apiKey) return;
+    async function send() {
+      const txt = document.getElementById("input").value.trim();
+      if (!txt || state.loading || !state.apiKey) return;
 
-      const userTurn = { role: "user", text, id: Date.now() };
-      state.recentTurns.push(userTurn);
-      
-      // 簡易的なメモリ抽出
-      if(text.includes("好き") || text.includes("予算")) {
-        state.memoryCards.unshift({ type:"fact", text: text.substring(0, 30) + "..." });
-      }
+      state.history.push({ role: "user", text: txt });
+      // 簡易的なメモリ保存
+      if (txt.match(/好き|嫌い|予算|目標/)) state.mems.unshift(txt.slice(0, 40) + "...");
 
-      els.input.value = "";
-      state.isLoading = true;
+      document.getElementById("input").value = "";
+      state.loading = true;
       render();
 
       try {
-        const contents = state.recentTurns.map(t => ({ role: t.role, parts: [{ text: t.text }] }));
-        const answer = await callGemini(contents);
-        state.recentTurns.push({ role: "model", text: answer });
-      } catch (err) {
-        // エラーをチャット内に表示
-        state.recentTurns.push({ 
+        const payload = state.history.filter(h => !h.error).map(h => ({ role: h.role, parts: [{ text: h.text }] }));
+        const ans = await call(payload);
+        state.history.push({ role: "model", text: ans });
+      } catch (e) {
+        // ★ ここでチャット吹き出しとしてエラーを表示
+        let errDesc = "通信エラー";
+        if (e.message.includes("429")) errDesc = "【無料枠の制限】リクエスト回数が多すぎます。1分ほど待ってから再試行してください。";
+        else if (e.message.includes("400")) errDesc = "【設定エラー】APIキーが無効、またはモデル名が正しくありません。";
+        else if (e.message.includes("403")) errDesc = "【権限エラー】APIキーの制限設定（IP制限など）を確認してください。";
+
+        state.history.push({ 
           role: "model", 
-          text: `⚠️ エラーが発生しました。\n\n【詳細】\n${err.message}`,
-          isError: true 
+          text: `⚠️ エラーが発生しました\n------------------\n${errDesc}\n\n(詳細: ${e.message})`, 
+          error: true 
         });
       } finally {
-        state.isLoading = false;
-        saveData();
+        state.loading = false;
+        localStorage.setItem("hist", JSON.stringify(state.history));
+        localStorage.setItem("mems", JSON.stringify(state.mems));
         render();
       }
     }
 
-    function saveData() {
-      localStorage.setItem("loom_turns", JSON.stringify(state.recentTurns));
-      localStorage.setItem("loom_mem", JSON.stringify(state.memoryCards));
-    }
-
     function render() {
-      els.chat.innerHTML = state.recentTurns.map(t => `
-        <div class="msg-row ${t.role}">
-          <div class="bubble ${t.isError ? 'error-bubble' : ''}">${t.text}</div>
+      const box = document.getElementById("chat-box");
+      box.innerHTML = state.history.map(h => `
+        <div class="msg-row ${h.role}">
+          <div class="bubble ${h.error ? 'error-bubble' : ''}">${h.text}</div>
         </div>
       `).join("");
-      
-      els.mem.innerHTML = state.memoryCards.map(m => `
-        <div class="memory-card">
-          <span class="memory-type ${m.type}">${m.type.toUpperCase()}</span>
-          <div>${m.text}</div>
-        </div>
-      `).join("");
-
-      document.getElementById("turn-count").textContent = `${state.recentTurns.length} turns`;
-      els.chat.scrollTop = els.chat.scrollHeight;
+      document.getElementById("mem-box").innerHTML = state.mems.map(m => `<div class="memory-card">${m}</div>`).join("");
+      box.scrollTop = box.scrollHeight;
     }
 
-    els.btn.onclick = sendMessage;
-    els.input.onkeydown = (e) => { if(e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); } };
-    
+    document.getElementById("send").onclick = send;
+    document.getElementById("input").onkeydown = (e) => { if(e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } };
     render();
+    if(!state.apiKey) setTimeout(openKey, 500);
   </script>
 </body>
 </html>
